@@ -15,7 +15,7 @@ test('api keys settings page can be viewed', function () {
     $response->assertStatus(200)
         ->assertInertia(fn ($page) => $page
             ->component('settings/ApiKeys')
-            ->has('hasApiKey')
+            ->has('providers')
         );
 });
 
@@ -26,8 +26,8 @@ test('api keys page shows when key exists in cache', function () {
     
     $response->assertStatus(200)
         ->assertInertia(fn ($page) => $page
-            ->where('hasApiKey', true)
-            ->where('isUsingEnvKey', false)
+            ->where('providers.openai.hasKey', true)
+            ->where('providers.openai.isUsingEnvKey', false)
         );
 });
 
@@ -38,8 +38,8 @@ test('api keys page shows when using environment key', function () {
     
     $response->assertStatus(200)
         ->assertInertia(fn ($page) => $page
-            ->where('hasApiKey', true)
-            ->where('isUsingEnvKey', true)
+            ->where('providers.openai.hasKey', true)
+            ->where('providers.openai.isUsingEnvKey', true)
         );
 });
 
@@ -48,7 +48,8 @@ test('can update api key with valid key', function () {
     $this->mockOpenAIModelsSuccess();
     
     $response = $this->put('/settings/api-keys', [
-        'openai_api_key' => $apiKey,
+        'provider' => 'openai',
+        'api_key' => $apiKey,
     ]);
     
     $response->assertRedirect('/settings/api-keys')
@@ -61,25 +62,27 @@ test('cannot update api key with invalid key', function () {
     $this->mockOpenAIModelsFailure();
     
     $response = $this->put('/settings/api-keys', [
-        'openai_api_key' => 'invalid-key',
+        'provider' => 'openai',
+        'api_key' => 'invalid-key',
     ]);
     
-    $response->assertSessionHasErrors(['openai_api_key']);
+    $response->assertSessionHasErrors(['api_key']);
     expect(Cache::has('app_openai_api_key'))->toBeFalse();
 });
 
 test('cannot update api key with short key', function () {
     $response = $this->put('/settings/api-keys', [
-        'openai_api_key' => 'short',
+        'provider' => 'openai',
+        'api_key' => 'short',
     ]);
     
-    $response->assertSessionHasErrors(['openai_api_key']);
+    $response->assertSessionHasErrors(['api_key']);
 });
 
 test('cannot update api key without providing key', function () {
     $response = $this->put('/settings/api-keys', []);
     
-    $response->assertSessionHasErrors(['openai_api_key']);
+    $response->assertSessionHasErrors(['api_key']);
 });
 
 test('can delete api key', function () {
@@ -104,10 +107,11 @@ test('api key validation handles connection errors gracefully', function () {
     $this->mockHttpTimeout();
     
     $response = $this->put('/settings/api-keys', [
-        'openai_api_key' => mockApiKey(),
+        'provider' => 'openai',
+        'api_key' => mockApiKey(),
     ]);
     
-    $response->assertSessionHasErrors(['openai_api_key']);
+    $response->assertSessionHasErrors(['api_key']);
     expect(Cache::has('app_openai_api_key'))->toBeFalse();
 });
 
@@ -125,7 +129,8 @@ test('api key is properly validated with OpenAI before saving', function () {
     ]);
     
     $response = $this->put('/settings/api-keys', [
-        'openai_api_key' => $apiKey,
+        'provider' => 'openai',
+        'api_key' => $apiKey,
     ]);
     
     $response->assertRedirect('/settings/api-keys');

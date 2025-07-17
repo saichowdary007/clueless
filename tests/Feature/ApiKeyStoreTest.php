@@ -29,12 +29,12 @@ class ApiKeyStoreTest extends TestCase
 
         $mockApiKeyService->shouldReceive('validateApiKey')
             ->once()
-            ->with($validApiKey)
+            ->with('openai', $validApiKey)
             ->andReturn(true);
 
         $mockApiKeyService->shouldReceive('setApiKey')
             ->once()
-            ->with($validApiKey);
+            ->with('openai', $validApiKey);
 
         $response = $this->postJson('/api/openai/api-key', [
             'api_key' => $validApiKey
@@ -56,7 +56,7 @@ class ApiKeyStoreTest extends TestCase
 
         $mockApiKeyService->shouldReceive('validateApiKey')
             ->once()
-            ->with($invalidApiKey)
+            ->with('openai', $invalidApiKey)
             ->andReturn(false);
 
         $mockApiKeyService->shouldNotReceive('setApiKey');
@@ -109,7 +109,7 @@ class ApiKeyStoreTest extends TestCase
 
         $mockApiKeyService->shouldReceive('validateApiKey')
             ->once()
-            ->with($validApiKey)
+            ->with('openai', $validApiKey)
             ->andThrow(new \Exception('Service error'));
 
         $response = $this->postJson('/api/openai/api-key', [
@@ -132,10 +132,12 @@ class ApiKeyStoreTest extends TestCase
 
         $mockApiKeyService->shouldReceive('validateApiKey')
             ->once()
+            ->with('openai', $validApiKey)
             ->andReturn(true);
 
         $mockApiKeyService->shouldReceive('setApiKey')
-            ->once();
+            ->once()
+            ->with('openai', $validApiKey);
 
         $response = $this->postJson('/api/openai/api-key', [
             'api_key' => $validApiKey

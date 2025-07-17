@@ -4,6 +4,7 @@ namespace App\Services;
 
 use App\Models\User;
 use Illuminate\Support\Facades\Log;
+use App\Services\ApiKeyService;
 use Ratchet\ConnectionInterface;
 use Ratchet\MessageComponentInterface;
 use WebSocket\Client as WebSocketClient;
@@ -16,9 +17,12 @@ class RealtimeRelayService implements MessageComponentInterface
 
     private string $openaiRealtimeUrl = 'wss://api.openai.com/v1/realtime';
 
-    public function __construct()
+    private ApiKeyService $apiKeyService;
+
+    public function __construct(ApiKeyService $apiKeyService)
     {
         $this->clients = new \SplObjectStorage;
+        $this->apiKeyService = $apiKeyService;
     }
 
     /**
@@ -26,13 +30,17 @@ class RealtimeRelayService implements MessageComponentInterface
      */
     private function getApiKey(?User $user = null): ?string
     {
-        // Check if there's a user with an API key
         if ($user && $user->openai_api_key) {
             return $user->openai_api_key;
         }
 
-        // Fall back to environment variable
-        return config('openai.api_key');
+        return $this->apiKeyService->getFallbackKey([
+            'openai',
+            'openrouter',
+            'anthropic',
+            'gemini',
+            'deepseek',
+        ]);
     }
 
     public function onOpen(ConnectionInterface $conn)
@@ -88,32 +96,35 @@ class RealtimeRelayService implements MessageComponentInterface
     private function connectToOpenAI(ConnectionInterface $clientConn)
     {
         try {
-            // Get API key (for now, use the env key - in a real app, you'd pass user info)
-            $apiKey = $this->getApiKey();
+            $providers = ['openai', 'openrouter', 'anthropic', 'gemini', 'deepseek'];
+            foreach ($providers as $provider) {
+                $apiKey = $this->apiKeyService->getApiKey($provider);
+                if (!$apiKey) {
+                    continue;
+                }
 
-            if (empty($apiKey)) {
-                throw new \Exception('No OpenAI API key available');
+                try {
+                    $headers = [
+                        'Authorization' => 'Bearer '.$apiKey,
+                        'OpenAI-Beta' => 'realtime=v1',
+                    ];
+
+                    $openaiConn = new WebSocketClient($this->openaiRealtimeUrl, [
+                        'timeout' => 60,
+                        'headers' => $headers,
+                    ]);
+
+                    $this->openaiConnections[$clientConn->resourceId] = $openaiConn;
+                    $this->setupOpenAIHandlers($clientConn, $openaiConn);
+                    Log::info("Connected to OpenAI Realtime API for client {$clientConn->resourceId}");
+
+                    return;
+                } catch (\Exception $e) {
+                    Log::warning("{$provider} key failed: {$e->getMessage()}");
+                }
             }
 
-            // Create WebSocket connection to OpenAI
-            $headers = [
-                'Authorization' => 'Bearer '.$apiKey,
-                'OpenAI-Beta' => 'realtime=v1',
-            ];
-
-            $openaiConn = new WebSocketClient($this->openaiRealtimeUrl, [
-                'timeout' => 60,
-                'headers' => $headers,
-            ]);
-
-            // Store the connection
-            $this->openaiConnections[$clientConn->resourceId] = $openaiConn;
-
-            // Set up message handler for OpenAI responses
-            $this->setupOpenAIHandlers($clientConn, $openaiConn);
-
-            Log::info("Connected to OpenAI Realtime API for client {$clientConn->resourceId}");
-
+            throw new \Exception('No API key available');
         } catch (\Exception $e) {
             Log::error("Failed to connect to OpenAI: {$e->getMessage()}");
             $clientConn->send(json_encode([

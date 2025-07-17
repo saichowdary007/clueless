@@ -14,7 +14,7 @@ AI-powered meeting assistant for real-time transcription, conversation analysis,
 
 **Requirements for running the app:**
 - macOS 10.15 or later
-- OpenAI API key (add it in the app settings)
+- API key from any supported provider (OpenAI, Anthropic, Gemini, OpenRouter, DeepSeek)
 
 No development tools needed - just download, install, and start transcribing!
 
@@ -50,7 +50,9 @@ For developers who want to contribute or run from source:
 - Node.js 18 or higher  
 - Composer
 - npm or yarn
-- OpenAI API key
+- API key from your preferred AI provider
+
+The application can store keys for multiple providers and will automatically try them in order if a request fails.
 
 ### Installation from Source
 
@@ -76,7 +78,7 @@ That's it! The app will handle database setup automatically.
 - **Backend**: Laravel 12.0 (PHP 8.2+)
 - **Frontend**: Vue 3.5.13 with TypeScript and Inertia.js
 - **Desktop**: NativePHP/Electron
-- **AI**: OpenAI Realtime API for transcription and analysis
+- **AI**: OpenAI-compatible APIs with fallback across multiple providers
 - **Styling**: Tailwind CSS 4.1.1
 - **Build**: Vite 6
 - **Database**: SQLite for local conversation storage

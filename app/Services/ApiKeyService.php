@@ -7,60 +7,76 @@ use Illuminate\Support\Facades\Http;
 
 class ApiKeyService
 {
-    private const CACHE_KEY = 'app_openai_api_key';
-    
+    private const CACHE_PREFIX = 'app_%s_api_key';
+
     /**
-     * Get the OpenAI API key from cache or environment
+     * Get an API key for the given provider from cache or environment.
      */
-    public function getApiKey(): ?string
+    public function getApiKey(string $provider): ?string
     {
-        // Check cache first (stored via settings page)
-        $cachedKey = Cache::get(self::CACHE_KEY);
+        $cacheKey = sprintf(self::CACHE_PREFIX, $provider);
+        $cachedKey = Cache::get($cacheKey);
         if ($cachedKey) {
             return $cachedKey;
         }
-        
-        // Fall back to environment variable
-        return config('openai.api_key');
+
+        return config("{$provider}.api_key");
     }
-    
+
     /**
-     * Store the API key in cache
+     * Store an API key for a provider in cache.
      */
-    public function setApiKey(string $apiKey): void
+    public function setApiKey(string $provider, string $apiKey): void
     {
-        Cache::forever(self::CACHE_KEY, $apiKey);
+        Cache::forever(sprintf(self::CACHE_PREFIX, $provider), $apiKey);
     }
-    
+
     /**
-     * Remove the stored API key
+     * Remove the stored API key for a provider.
      */
-    public function removeApiKey(): void
+    public function removeApiKey(string $provider): void
     {
-        Cache::forget(self::CACHE_KEY);
+        Cache::forget(sprintf(self::CACHE_PREFIX, $provider));
     }
-    
+
     /**
-     * Check if an API key is available
+     * Check if an API key is available for the provider.
      */
-    public function hasApiKey(): bool
+    public function hasApiKey(string $provider): bool
     {
-        return !empty($this->getApiKey());
+        return !empty($this->getApiKey($provider));
     }
-    
+
     /**
-     * Validate an API key with OpenAI
+     * Validate an API key by hitting the provider's models endpoint.
      */
-    public function validateApiKey(string $apiKey): bool
+    public function validateApiKey(string $provider, string $apiKey): bool
     {
         try {
+            $base = config("{$provider}.base_uri") ?: 'https://api.openai.com/v1';
+            $url = rtrim($base, '/') . '/models';
             $response = Http::withHeaders([
                 'Authorization' => 'Bearer ' . $apiKey,
-            ])->get('https://api.openai.com/v1/models');
-            
+            ])->get($url);
+
             return $response->successful();
         } catch (\Exception $e) {
             return false;
         }
+    }
+
+    /**
+     * Return the first available API key from the given providers.
+     */
+    public function getFallbackKey(array $providers): ?string
+    {
+        foreach ($providers as $provider) {
+            $key = $this->getApiKey($provider);
+            if (!empty($key)) {
+                return $key;
+            }
+        }
+
+        return null;
     }
 }

@@ -22,32 +22,46 @@ class RealtimeController extends Controller
     public function generateEphemeralKey(Request $request)
     {
         try {
-            $apiKey = $this->apiKeyService->getApiKey();
-            
-            if (!$apiKey) {
-                return response()->json([
-                    'status' => 'error',
-                    'message' => 'OpenAI API key not configured',
-                ], 422);
+            $providers = ['openai', 'openrouter', 'anthropic', 'gemini', 'deepseek'];
+            $data = null;
+            foreach ($providers as $provider) {
+                $apiKey = $this->apiKeyService->getApiKey($provider);
+                if (!$apiKey) {
+                    continue;
+                }
+
+                $response = Http::withHeaders([
+                    'Authorization' => 'Bearer ' . $apiKey,
+                    'Content-Type' => 'application/json',
+                ])->post('https://api.openai.com/v1/realtime/sessions', [
+                    'model' => 'gpt-4o-realtime-preview-2024-12-17',
+                    'voice' => $request->input('voice', 'alloy'),
+                ]);
+
+                if ($response->successful()) {
+                    $data = $response->json();
+                    break;
+                }
+
+                if (in_array($response->status(), [401, 403, 500])) {
+                    Log::warning("{$provider} key failed: " . $response->status());
+                    continue;
+                }
+
+                Log::error('API error: ' . $response->body());
             }
 
-            // Generate ephemeral key from OpenAI Realtime API
-            $response = Http::withHeaders([
-                'Authorization' => 'Bearer ' . $apiKey,
-                'Content-Type' => 'application/json',
-            ])->post('https://api.openai.com/v1/realtime/sessions', [
-                'model' => 'gpt-4o-realtime-preview-2024-12-17',
-                'voice' => $request->input('voice', 'alloy'),
-            ]);
+            if (!$data) {
+                if (!$this->apiKeyService->getFallbackKey($providers)) {
+                    return response()->json([
+                        'status' => 'error',
+                        'message' => 'No API key configured',
+                    ], 422);
+                }
 
-            if (!$response->successful()) {
-                Log::error('OpenAI API error: ' . $response->body());
-                throw new \Exception('Failed to generate ephemeral key from OpenAI: ' . $response->status());
+                throw new \Exception('Failed to generate ephemeral key');
             }
 
-            $data = $response->json();
-            
-            // Validate response structure
             if (!isset($data['client_secret']['value']) || !isset($data['client_secret']['expires_at'])) {
                 Log::error('Invalid response structure from OpenAI API', ['response' => $data]);
                 throw new \Exception('Invalid response structure from OpenAI API');

@@ -24,12 +24,18 @@ class ApiKeyController extends Controller
      */
     public function edit(Request $request): Response
     {
-        $hasApiKey = $this->apiKeyService->hasApiKey();
-        $isUsingEnvKey = !cache()->has('app_openai_api_key') && $hasApiKey;
-        
+        $providers = ['openai', 'anthropic', 'gemini', 'openrouter', 'deepseek'];
+        $status = [];
+        foreach ($providers as $provider) {
+            $hasKey = $this->apiKeyService->hasApiKey($provider);
+            $status[$provider] = [
+                'hasKey' => $hasKey,
+                'isUsingEnvKey' => !cache()->has('app_'.$provider.'_api_key') && $hasKey,
+            ];
+        }
+
         return Inertia::render('settings/ApiKeys', [
-            'hasApiKey' => $hasApiKey,
-            'isUsingEnvKey' => $isUsingEnvKey,
+            'providers' => $status,
         ]);
     }
 
@@ -38,21 +44,18 @@ class ApiKeyController extends Controller
      */
     public function update(Request $request): RedirectResponse
     {
-        $request->validate([
-            'openai_api_key' => ['required', 'string', 'min:20'],
+        $validated = $request->validate([
+            'provider' => ['required', 'string', 'in:openai,anthropic,gemini,openrouter,deepseek'],
+            'api_key' => ['required', 'string', 'min:20'],
         ]);
 
-        $apiKey = $request->input('openai_api_key');
-
-        // Validate the API key
-        if (!$this->apiKeyService->validateApiKey($apiKey)) {
+        if (!$this->apiKeyService->validateApiKey($validated['provider'], $validated['api_key'])) {
             throw ValidationException::withMessages([
-                'openai_api_key' => ['The provided API key is invalid. Please check and try again.'],
+                'api_key' => ['The provided API key is invalid. Please check and try again.'],
             ]);
         }
 
-        // Store the API key
-        $this->apiKeyService->setApiKey($apiKey);
+        $this->apiKeyService->setApiKey($validated['provider'], $validated['api_key']);
 
         return redirect()->route('api-keys.edit')->with('success', 'API key updated successfully.');
     }
@@ -62,7 +65,8 @@ class ApiKeyController extends Controller
      */
     public function destroy(Request $request): RedirectResponse
     {
-        $this->apiKeyService->removeApiKey();
+        $provider = $request->input('provider', 'openai');
+        $this->apiKeyService->removeApiKey($provider);
 
         return redirect()->route('api-keys.edit')->with('success', 'API key deleted successfully.');
     }
@@ -72,14 +76,15 @@ class ApiKeyController extends Controller
      */
     public function store(Request $request)
     {
-        $request->validate([
+        $validated = $request->validate([
+            'provider' => ['sometimes', 'string', 'in:openai,anthropic,gemini,openrouter,deepseek'],
             'api_key' => ['required', 'string', 'min:20'],
         ]);
 
-        $apiKey = $request->input('api_key');
+        $provider = $validated['provider'] ?? 'openai';
+        $apiKey = $validated['api_key'];
 
-        // Validate the API key
-        if (!$this->apiKeyService->validateApiKey($apiKey)) {
+        if (!$this->apiKeyService->validateApiKey($provider, $apiKey)) {
             return response()->json([
                 'success' => false,
                 'message' => 'The provided API key is invalid. Please check and try again.',
@@ -87,7 +92,7 @@ class ApiKeyController extends Controller
         }
 
         // Store the API key
-        $this->apiKeyService->setApiKey($apiKey);
+        $this->apiKeyService->setApiKey($provider, $apiKey);
 
         return response()->json([
             'success' => true,
