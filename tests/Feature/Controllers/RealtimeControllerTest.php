@@ -46,7 +46,7 @@ test('generateEphemeralKey returns error when no API key configured', function (
     $response->assertStatus(422)
         ->assertJson([
             'status' => 'error',
-            'message' => 'OpenAI API key not configured',
+            'message' => 'No API key configured',
         ]);
 });
 
@@ -143,6 +143,20 @@ test('generateEphemeralKey uses API key from config when cache is empty', functi
     $response = $this->postJson('/api/realtime/ephemeral-key');
     
     // Assert
+    $response->assertStatus(200)
+        ->assertJson(['status' => 'success']);
+});
+
+test('generateEphemeralKey falls back to next provider on failure', function () {
+    Cache::put('app_openai_api_key', mockApiKey());
+    Cache::put('app_gemini_api_key', 'sk-other');
+
+    Http::fakeSequence()
+        ->push(['error' => 'invalid'], 401)
+        ->push(mockEphemeralKeyResponse(), 200);
+
+    $response = $this->postJson('/api/realtime/ephemeral-key');
+
     $response->assertStatus(200)
         ->assertJson(['status' => 'success']);
 });

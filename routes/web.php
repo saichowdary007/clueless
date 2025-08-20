@@ -41,7 +41,7 @@ Route::post('/api/realtime/ephemeral-key', [\App\Http\Controllers\RealtimeContro
 Route::get('/api/openai/status', function () {
     $apiKeyService = app(\App\Services\ApiKeyService::class);
     return response()->json([
-        'hasApiKey' => $apiKeyService->hasApiKey(),
+        'hasApiKey' => (bool) $apiKeyService->getFallbackKey(['openai','openrouter','anthropic','gemini','deepseek']),
     ]);
 })->name('api.openai.status');
 

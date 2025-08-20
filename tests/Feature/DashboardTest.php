@@ -5,7 +5,7 @@ use App\Services\ApiKeyService;
 test('dashboard page is accessible', function () {
     // Mock API key service to return true (API key exists)
     $mockApiKeyService = Mockery::mock(ApiKeyService::class);
-    $mockApiKeyService->shouldReceive('hasApiKey')->andReturn(true);
+    $mockApiKeyService->shouldReceive('getFallbackKey')->andReturn('key');
     $this->app->instance(ApiKeyService::class, $mockApiKeyService);
     
     $response = $this->get('/dashboard');
@@ -15,7 +15,7 @@ test('dashboard page is accessible', function () {
 test('realtime agent page is accessible', function () {
     // Mock API key service to return true (API key exists)
     $mockApiKeyService = Mockery::mock(ApiKeyService::class);
-    $mockApiKeyService->shouldReceive('hasApiKey')->andReturn(true);
+    $mockApiKeyService->shouldReceive('getFallbackKey')->andReturn('key');
     $this->app->instance(ApiKeyService::class, $mockApiKeyService);
     
     $response = $this->get('/realtime-agent');

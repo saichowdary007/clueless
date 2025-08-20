@@ -35,7 +35,7 @@ class CheckOnboardingTest extends TestCase
         $route->name('onboarding');
         $request->setRouteResolver(fn() => $route);
 
-        $this->mockApiKeyService->shouldNotReceive('hasApiKey');
+        $this->mockApiKeyService->shouldNotReceive('getFallbackKey');
 
         $response = $this->middleware->handle($request, function ($req) {
             return new Response('OK');
@@ -61,7 +61,7 @@ class CheckOnboardingTest extends TestCase
             $route->name($routeName);
             $request->setRouteResolver(fn() => $route);
 
-            $this->mockApiKeyService->shouldNotReceive('hasApiKey');
+            $this->mockApiKeyService->shouldNotReceive('getFallbackKey');
 
             $response = $this->middleware->handle($request, function ($req) {
                 return new Response('OK');
@@ -78,7 +78,7 @@ class CheckOnboardingTest extends TestCase
         $route->name('api.some-endpoint');
         $request->setRouteResolver(fn() => $route);
 
-        $this->mockApiKeyService->shouldNotReceive('hasApiKey');
+        $this->mockApiKeyService->shouldNotReceive('getFallbackKey');
 
         $response = $this->middleware->handle($request, function ($req) {
             return new Response('OK');
@@ -94,9 +94,9 @@ class CheckOnboardingTest extends TestCase
         $route->name('dashboard');
         $request->setRouteResolver(fn() => $route);
 
-        $this->mockApiKeyService->shouldReceive('hasApiKey')
+        $this->mockApiKeyService->shouldReceive('getFallbackKey')
             ->once()
-            ->andReturn(false);
+            ->andReturnNull();
 
         $response = $this->middleware->handle($request, function ($req) {
             return new Response('Should not reach here');
@@ -113,9 +113,9 @@ class CheckOnboardingTest extends TestCase
         $route->name('dashboard');
         $request->setRouteResolver(fn() => $route);
 
-        $this->mockApiKeyService->shouldReceive('hasApiKey')
+        $this->mockApiKeyService->shouldReceive('getFallbackKey')
             ->once()
-            ->andReturn(true);
+            ->andReturn('key');
 
         $response = $this->middleware->handle($request, function ($req) {
             return new Response('Dashboard content');
@@ -129,9 +129,9 @@ class CheckOnboardingTest extends TestCase
         $request = Request::create('/some-path', 'GET');
         // No route set - route() returns null
 
-        $this->mockApiKeyService->shouldReceive('hasApiKey')
+        $this->mockApiKeyService->shouldReceive('getFallbackKey')
             ->once()
-            ->andReturn(false);
+            ->andReturnNull();
 
         $response = $this->middleware->handle($request, function ($req) {
             return new Response('OK');
